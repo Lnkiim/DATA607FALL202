@@ -1,6 +1,6 @@
 ---
-title: "Lab Name"
-author: "Author Name"
+title: "DAT607: Assignment1 Loading Data into a Dataframe"
+author: "Ellen Kim"
 date: "`r Sys.Date()`"
 output: openintro::lab_report
 ---
