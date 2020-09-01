@@ -1,0 +1,61 @@
+---
+title: "Lab Name"
+author: "Author Name"
+date: "`r Sys.Date()`"
+output: openintro::lab_report
+---
+
+```{r load-packages, message=FALSE}
+library(tidyverse)
+library(openintro)
+library (readr)
+library(corrplot)
+library(ggcorrplot)
+```
+
+### Load the data
+This dataset is explored in an article titled 'The Ultimate Halloween Candy Power Ranking'. https://fivethirtyeight.com/videos/the-ultimate-halloween-candy-power-ranking/
+This article explores the attributes of any particular candy, desirable by trick-or-treaters.
+
+```{r load-data}
+urlfile = "https://raw.githubusercontent.com/fivethirtyeight/data/master/candy-power-ranking/candy-data.csv"
+candy_df<-read_csv(url(urlfile))
+```
+
+
+### Select Subset of Data
+Dropped column pricePercent because this was an attribute that was engineered in addition to the original set and normalized but doesn't seem related to the study. The results of the dataset asked "which would you prefer as a trick-or-treater?" While a thrifty trick-or-treater  may consider financial gains, these kids would probably make a very small proportion of the trick-or-treating demographic. 
+The target variable 'winpercent' is an aggregate metric from a survey that pits one candy vs another by random. The 'winpercent' expresses the ratio of wins to total matchups per candy.  
+
+```{r subset-data}
+candy_subset_df = subset(candy_df, select = -c(pricepercent))
+```
+
+### Rename Headers
+All booleans are indicated with a preface 'is_'. 
+'Fruit' was changed to 'is_fruity' because the original header could be misinterpretted as containing fruit. (eg: raisinets)
+
+```{r rename-headers}
+colnames(candy_subset_df) <- c("candy_name", "is_chocolate","is_fruity", "is_caramel", "is_nutty", "is_nougat", "is_crispedRice", "is_hardCandy", "is_candyBar", "is_multiPiece" ,"sugarPercentage" , "winPercentage")
+```
+
+### Data Engineer
+The attribute winPercentage isn't expressed as a percentage. Since the values are still expressed between 0 and 100 this wouldn't affect the model but for interpretability sake it should be expressed numerically as a percentage.
+
+```{r clean-data}
+candy_subset_df <- candy_subset_df %>%
+  mutate(winPercentage = winPercentage / 100)
+```
+
+
+### Conclusions
+The researcher did a good job looking at each attribute and assessing how much it contributed to the winPercentage. He also posits the question "Can we build the perfect Frankencandy based on this information?" It would be an oversimplification to just take the top attributes and mesh them altogether. The attributes are not singularly linked to the target winPercentage. The attributes are also correlated with each other and work to compliment the flavor/texture/mouthfeel/etc. For example, if we took the top two components it would be chocolate and fruit. We would be incorrect in assuming that candy with fruity and chocolatey taste profiles would be the winning combination. By this logic, raisinets or chocolate covered skittles should be ranked first. If I could make a theory, I would guess that these two are the top characteristics because these are the foundational flavor profiles of most candies, and in fact, are usually one or the other, not both.
+
+#### Further EDA - Correlation between attributes
+Looking at the correlation heatmap below we can see that my theory above is true. This means they are less likely to occur together. There is an inverse relationship between chocolate and fruity even though they are the top two attributes. We can also see that most of the attributes are somehow correlated with chocolate. While chocolate is the most influential attribute to winPercentage, this also points to a flaw in the study. The attributes of the study are imbalanced, as most describe chocolate bars (caramel, crispedrice, nougat) and less often describe fruity candy which don't have these characteristics. To create a more balanced dataset we should observe more objective traits that both chocolate and candy share. At the least, we can also include traits that describe non-chocolate candy (eg: 'chewy', sour, etc)
+
+
+```{r corr-attributes}
+corr_subset <- subset(candy_subset_df, select = -c(candy_name))
+corr <- cor(corr_subset)
+ggcorrplot(corr)
