@@ -1,0 +1,139 @@
+---
+title: "Assignment 2 : SQL and R"
+author: "Ellen Kim"
+date: "`r Sys.Date()`"
+output: openintro::lab_report
+
+---
+ 
+```{r load-packages, message=FALSE}
+library(tidyverse)
+library(openintro)
+library(RMariaDB)
+library(dplyr)
+library(keyring)
+library(DBI)
+```
+ 
+
+### Connect to Local Database
+ 
+```{r, echo=FALSE}
+
+kr_name <- "movie_keyring"
+kr_service <- "movies_assign2"
+kr_username <- "root"
+localuserpassword = keyring::backend_file$new()$get(service = kr_service,
+                                user = kr_username,
+                                keyring = kr_name)
+```
+
+```{r db-connect}
+
+
+moviesDb <- dbConnect(RMariaDB::MariaDB(), user='root', password=localuserpassword, dbname=kr_service , host='localhost')
+
+dbListTables(moviesDb)
+
+
+```
+
+### Query from Databse
+```{r query}
+query_str <- ' select *
+ from reviews r
+ left join reviewers rs on r.user_id = rs.user_id
+ left join movies m on m.movie_id = r.movie_id;'
+
+
+print(query_str)
+
+
+# Fetch all results:
+res <- dbSendQuery(moviesDb, query_str)
+reviews_df <- dbFetch(res)
+
+dbClearResult(res)
+```
+
+
+### How To Handle Missing Data and Analysis
+Q: Is there a movie that you would recommend or not recommend to one of the participants? Explain your reasoning.
+
+There are only 2 null values. Michal hasn't seen 'Blade Runner' and Dwight hasn't seen 'Silence of the Lambs'.
+So I can only make one of two recommendations. A summary statistic like the average score per movie could be insightful. Unfortunately, both 'Blade Runner' and 'Silence of the Lambs' had exactly the same score. 
+
+```{r missing-data}
+ # new dataframe that drops na's.
+reviews_df2 <- reviews_df[complete.cases(reviews_df), ]
+ 
+movie_avg <- aggregate(reviews_df2$score, list(reviews_df2$movie_title), FUN=mean)
+```
+ 
+ 
+### Disconnect from Local Database
+
+```{r db-disconnect}
+dbDisconnect(moviesDb)
+```
+
+
+### DDL statements to build schema
+This should be run on WorkBench not in R. Its only posted here so that all rubric requirements are in one place.
+ 
+
+Create schema for movies 
+Follow 3rd normal form
+
+DROP TABLE IF EXISTS movies, reviewers,reviews ;
+
+ CREATE TABLE `movies` (
+  `movie_id` int NOT NULL,
+  `movie_title` varchar(45) DEFAULT NULL,
+  PRIMARY KEY (`movie_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+CREATE TABLE `reviewers` (
+  `user_id` int NOT NULL,
+  `first_name` varchar(45) DEFAULT NULL,
+  PRIMARY KEY (`user_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+CREATE TABLE `reviews` (
+  `review_id` int NOT NULL,
+  `user_id` int DEFAULT NULL,
+  `movie_id` int DEFAULT NULL,
+  `score` int DEFAULT NULL,
+  PRIMARY KEY (`review_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+ 
+
+
+### SQL to Load Tables
+This should be run on WorkBench not in R. Its only posted here so that all rubric requirements are in one place.
+
+ 
+LOAD DATA INFILE 'c:/data/input/movies_raw.csv' 
+INTO TABLE movies
+FIELDS TERMINATED BY ','  
+LINES TERMINATED BY '\n'
+(movie_id, movie_title);
+ 
+LOAD DATA INFILE 'c:/data/input/reviewers_raw.csv' 
+INTO TABLE reviewers
+FIELDS TERMINATED BY ','  
+LINES TERMINATED BY '\n'
+(user_id, first_name);
+
+LOAD DATA INFILE 'c:/data/input/reviews_raw2.csv' 
+INTO TABLE reviews
+FIELDS TERMINATED BY ','  
+LINES TERMINATED BY '\n'
+(review_id, user_id, movie_id, score); 
+ 
+ 
+### Documentation
+ 
+- If the survey is designed properly this should have to handle null values. When the data is ingested from the survey tool and pipelined to the database, there should be logic to handle movies where the score is null, as these rows should not be entered in the database. That way we wouldn't need additional logic downstream to handle null values, especially for normalized tables.
+- Login credentials are secured using keyring library.
