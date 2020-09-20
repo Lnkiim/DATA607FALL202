@@ -1,0 +1,190 @@
+---
+title: "Project 1: Data Analysis"
+author: "Ellen Kim"
+date: "`r Sys.Date()`"
+output:  
+---
+
+```{r load-packages, message=FALSE}
+library(tidyverse)
+library(openintro)
+library (readr)
+library(dplyr)
+library(stringr)
+urlfile="/Users/ellenkim/CUNY/data_acquisition_management/Project1/Project1_ek/tournamentinfo.txt"
+ 
+```
+
+### Exercise 1
+ 
+
+```{r code-chunk-label}
+# reads in data, using tab as delimiter
+raw_tournament_df <- read.table(urlfile, header = FALSE, sep = "\t")
+
+# creating new columns by parsing by |
+tournament_df2 <- raw_tournament_df %>% separate(V1, c("Pair","player_name","total_pts","round1", "round2", "round3", "round4","round5", "round6","round7"), sep ="(\\|)")
+
+# exclude all rows with --- in the 'Pair' column
+tournament_df2 <- dplyr::filter(tournament_df2, !grepl("-------",Pair))
+
+tournament_df3 <- tournament_df2
+
+# Regex function that can be used to extract all numerical characters
+number_extract <- function(string){ 
+  str_extract(string, "\\d+\\.*\\d*")
+}
+
+# Regex function that can be used to extract all alphabet characters
+string_extract <- function(string){ 
+  str_extract(string, "\\D+\\.*\\D*")
+}
+ 
+# only populate id if its number type
+tournament_df3$playerId <- number_extract(tournament_df3$Pair) 
+
+for (column_name in c("Pair", "round1", "round2", "round3", "round4","round5", "round6","round7")){ 
+  number_extract(column_name) 
+}
+
+#only populate if alphabet type
+tournament_df3$city <- string_extract(tournament_df3$Pair) 
+
+# cascades playerID down
+tournament_df3 <- 
+  tournament_df3 %>% 
+    fill(playerId) %>% 
+    mutate(
+      w = ifelse(cummax(playerId) > 2, cummax(playerId), playerId)
+    )
+ 
+# separate first and second rows for each user
+tournament_df3 <- tournament_df3 %>% 
+  group_by(playerId) %>%
+  mutate(ranking = rank(row_number()) )
+
+# create 2 separate dataframes 
+ 
+rounds_df1 = tournament_df3 %>% filter(ranking  == 1)
+user_points_df1 = tournament_df3 %>% filter(ranking  == 2)
+```
+
+### Dataframe that contains information per round
+Extract all opponent numbers
+
+``` {r}
+rounds_df1
+# extract opponent's playerId for round 1
+rounds_df1$opponent1 <- number_extract(rounds_df1$round1) 
+rounds_df1$opponent2 <- number_extract(rounds_df1$round2) 
+rounds_df1$opponent3 <- number_extract(rounds_df1$round3) 
+rounds_df1$opponent4 <- number_extract(rounds_df1$round4) 
+rounds_df1$opponent5 <- number_extract(rounds_df1$round5) 
+rounds_df1$opponent6 <- number_extract(rounds_df1$round6) 
+rounds_df1$opponent7 <- number_extract(rounds_df1$round7) 
+```
+
+
+### Dataframe that contains user-level data
+```{r}
+# extract the pre-score
+
+# Regex function that can be used to extract all numerical characters
+pre_score <- function(string){ 
+  str_extract(str_extract(string, "R:\\s+\\d+[a-zA-Z ]"), "\\d+")
+}
+
+# Applying function to extract preScore
+user_points_df1$preScore <- pre_score(user_points_df1$player_name) 
+
+# New df with subset of columns: state, playerId, prescore
+user_points_subset_columns <- c("Pair", "playerId","preScore")
+user_points_subset <-user_points_df1[user_points_subset_columns]
+
+# Rename user_state
+colnames(user_points_subset)[1] <- c("user_state")
+```
+
+### How many games did each player play?
+We only count W/L/D as games played. 
+
+```{r}
+rounds_df1$gamesPlayed <- NA
+#rounds_df1 %>% add_column(dfs = NA)
+
+count_games <- function(string){ 
+  if (grepl("[WLD]", string) == TRUE) 1 else 0
+}
+
+# iterate through rows of the df to apply function, then sum, insert value into new column
+
+for(i in 1:nrow(rounds_df1)) {
+    row <- rounds_df1[i,] 
+    rounds_df1$gamesPlayed[i] <-  count_games(row$round1) + count_games(row$round2) + count_games(row$round3) + count_games(row$round4) + count_games(row$round5) + count_games(row$round6) + count_games(row$round7)
+}
+
+
+# New df with subset of columns
+rounds_subset_cols <- c("playerId", "player_name", "total_pts", "opponent1","opponent2","opponent3","opponent4","opponent5","opponent6","opponent7", "gamesPlayed" )
+rounds_subset <- rounds_df1[rounds_subset_cols]
+
+```
+
+
+
+### Get preScore of Opponents
+```{r}
+masterdf_1 <- merge(x = rounds_subset, y = user_points_subset, by = "playerId", all = TRUE)
+ 
+masterdf_1$playerId <- as.numeric(as.character(masterdf_1$playerId))
+
+#create new column
+masterdf_1$sumOppPreScore <- NA
+
+# Change datatype from char to numeric
+cols_num <- c("playerId","total_pts", "opponent1","opponent2","opponent3","opponent4","opponent5", "opponent6" ,"opponent7", "preScore", "sumOppPreScore")
+masterdf_1[cols_num] <- sapply(masterdf_1[cols_num],as.numeric)
+sapply(masterdf_1, class)
+ 
+ 
+#handle NA's where player didn't have an opponent on any given week
+clear_score <- function(score_opp){
+  if(is.na(score_opp)) 0 else score_opp  
+}
+
+# sum all the opponent's preScores
+for(i in 1:nrow(masterdf_1)){
+  opp1_score <- clear_score(masterdf_1$preScore[masterdf_1$playerId == masterdf_1[i,"opponent1"] ][1])
+  opp2_score <- clear_score(masterdf_1$preScore[masterdf_1$playerId == masterdf_1[i,"opponent2"] ][1])
+  opp3_score <- clear_score(masterdf_1$preScore[masterdf_1$playerId == masterdf_1[i,"opponent3"] ][1])
+  opp4_score <- clear_score(masterdf_1$preScore[masterdf_1$playerId == masterdf_1[i,"opponent4"] ][1])
+  opp5_score <- clear_score(masterdf_1$preScore[masterdf_1$playerId == masterdf_1[i,"opponent5"] ][1])
+  opp6_score <- clear_score(masterdf_1$preScore[masterdf_1$playerId == masterdf_1[i,"opponent6"] ][1])
+  opp7_score <- clear_score(masterdf_1$preScore[masterdf_1$playerId == masterdf_1[i,"opponent7"] ][1])
+  tot_opp_score <-  opp1_score + opp2_score +  opp3_score + opp4_score +  opp5_score + opp6_score + opp7_score
+  masterdf_1$sumOppPreScore[i] <- tot_opp_score[1]
+}
+
+
+```
+
+
+### Calculate Average Opponent's PreScore
+Sum of opponents prescore / total games played
+```{r}
+
+masterdf_1$avg_opp_preScore <- masterdf_1$sumOppPreScore / masterdf_1$gamesPlayed
+```
+
+
+### Final Cleaning - subset
+Player’s Name, Player’s State, Total Number of Points, Player’s Pre-Rating, and Average Pre Chess Rating of Opponents
+```{r}
+final_subset <- c("player_name","user_state","total_pts", "preScore","avg_opp_preScore")
+final_chess_data <- masterdf_1[final_subset]
+
+#drop null row that used to be header
+final_chess_data <- na.omit(final_chess_data)
+```
+ 
+ 
