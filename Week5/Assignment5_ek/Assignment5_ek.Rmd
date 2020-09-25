@@ -1,24 +1,113 @@
 ---
-title: "Lab Name"
-author: "Author Name"
+title: "Assignment 5: Tidying and Transforming Data"
+author: "Ellen Kim"
 date: "`r Sys.Date()`"
 output: openintro::lab_report
 ---
 
 ```{r load-packages, message=FALSE}
+library(plyr)
 library(tidyverse)
 library(openintro)
+library(readr)
+library(tidyr)
+library(dplyr)
 ```
 
-### Exercise 1
+## High Level Overview
+We've been presented with a dataset that aggregates to an airline level. The dataset is considered wide because each airport that corresponds to an airline is represented as individual columns. To add another more complexity, the dataset has two level of indexes for rows, airline and flight status (delayed, on time). My overall approach was to transpose the dataset so that cities become row values and the two flight status's become columns. 
 
-Insert any text here.
+## Read in raw data.
 
-```{r code-chunk-label}
-# Insert code for Exercise 1 here
+Reading from github.
+The data format is not normalized and has null columns which will render warning output but the data will load.
+
+```{r data-in}
+data_url = "https://raw.githubusercontent.com/Lnkiim/DATA607FALL202/master/Week5/Assignment5_ek/flights_data.csv"
+flights_raw <- read_csv(url(data_url))
 ```
 
-### Exercise 2
+## Data Pivot
+```{r}
 
-...
+# renaming headers 
+flights_raw <- flights_raw %>%
+  rename("airline" = X1,
+         "status" = X2    )
 
+# fill airline values where null 
+flights<- flights_raw %>% tidyr::fill(airline)
+
+# transpose dataframe 
+flights <- flights %>%
+  gather(key = airports, value = flight_count, "Los Angeles":"Seattle")
+ 
+# transpose status to columns
+flights <- flights %>%
+  spread(key = status, value = flight_count)
+
+# rename column because space in a variable is bad practice
+flights <-
+  flights %>%
+    rename(on_time = "on time")
+
+
+```
+
+## Analysis of Arrival Times
+
+### Compare the overall on-time performance for both airlines.
+On average, AM WEST has a higher rate of being on time than Alaska.
+```{r}
+ 
+flights %>%
+  select(airline, delayed, on_time) %>%
+    group_by(airline) %>%
+      summarize(tot_flights = sum(delayed) + sum(on_time),
+             total_onTime = sum(on_time),
+             total_delayed = sum(delayed),
+             onTime_rate = total_onTime / tot_flights,
+             delayed_rate = total_delayed / tot_flights 
+             ) %>%
+  select(airline,onTime_rate,delayed_rate)
+
+```
+
+### Compare the per-city on-time performance for both airlines.
+If we compare airlines by city, Alaska has a higher on-time rate than AM WEST in every city, with the exception of Seattle.
+However, AM WEST has an overall higher on-time rate. How is that AM WEST has a higher rate over but loses to Alaska if compared by city?
+This is because AM WEST has more flights in total. If you look at airports like Phoenix, AM WEST has 5255 flights vs Alaska's 233. It also has a higher rate of on-time flights (92%) in Seattle than Alaska's overall average so the weight of this airport affect's AM WEST's overall on-time rate.
+
+```{r}
+ 
+flights_byCity <-
+  flights %>% 
+    group_by(airline, airports) %>%
+      summarize(tot_flights = sum(delayed) + sum(on_time),
+             total_onTime = sum(on_time),
+             onTime_rate = total_onTime / tot_flights 
+             ) %>% 
+          arrange(airports, airline)
+         
+```
+### Data Visualization 
+Here we can see that the the overall higher average of AM WEST is greatly attributed to the weight of Phoenix.
+
+```{r}
+#stacked bar chart to compare per city
+
+# Calculate the cumulative sum of len for each dose
+flights_rollingSum <- ddply(flights_byCity, "airports",
+                   transform, label_ypos=cumsum(tot_flights))
+ 
+ # Create the barplot
+ggplot(data=flights_rollingSum, aes(x=airports, y=tot_flights, fill=airline)) +
+  geom_bar(stat="identity")+
+  geom_text(aes(y=label_ypos, label=tot_flights), vjust=1.6, 
+            color="white", size=3.5)+
+  scale_fill_brewer(palette="Paired")+
+  theme_minimal()
+```
+
+## Conclusion
+It seems like weather is a significant factor in determing on-time rates. We can see that cities like Phoenix have a significant number of flights with a high rate of being on time and thats most likely because there isn't much turbulent weather. Conversely if we observe cities like Seattle, where it rains frequently, we see more delays.
