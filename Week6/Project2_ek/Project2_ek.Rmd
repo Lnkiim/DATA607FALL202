@@ -1,24 +1,99 @@
 ---
-title: "Lab Name"
-author: "Author Name"
+title: "Project 2"
+author: "Ellen Kim"
 date: "`r Sys.Date()`"
 output: openintro::lab_report
+editor_options: 
+  chunk_output_type: console
 ---
 
 ```{r load-packages, message=FALSE}
 library(tidyverse)
 library(openintro)
+library (readr)
+library(wesanderson)
 ```
 
-### Exercise 1
+## Problem 1: Students performance in exams
+Analysis: Correlation between students performance and parental level of education.
 
-Insert any text here.
+### Read in Data  
 
-```{r code-chunk-label}
-# Insert code for Exercise 1 here
+```{r}
+url_1="https://raw.githubusercontent.com/Lnkiim/DATA607FALL202/master/Week6/StudentsPerformance.csv"
+raw_studentExam <-read_csv(url(url_1))
 ```
 
-### Exercise 2
+### What was the average score according to parental level of education?
+ 
+```{r}
+# change header names
+studentExam <-
+  raw_studentExam %>%
+    rename(reading_score = `reading score`,
+           math_score = `math score`,
+          writing_score = `writing score`,
+          parent_education = `parental level of education`,
+          test_prep = `test preparation course`,
+          race_group = `race/ethnicity`
+          )
 
-...
+# create total score
+studentExam <-
+  studentExam %>%
+    mutate(total_score = writing_score + math_score +reading_score)
+
+
+# calculate average
+avgByParentEd <- 
+  studentExam %>%
+    select(parent_education, total_score, math_score, reading_score, writing_score) %>%
+      group_by(parent_education) %>%
+        summarize(avg_total_score = mean(total_score),
+                  avg_math = mean(math_score),
+                  avg_reading = mean(reading_score),
+                  avg_writing = mean(writing_score)
+                  )
+
+# transpose dataframe to prep for plotting
+avgByParentEd <- 
+  avgByParentEd %>%
+    gather(key=test_category, value=score, "avg_total_score":"avg_writing")
+
+
+# graph
+
+
+
+ggplot(data = avgByParentEd, aes(x=test_category, y = score, fill=parent_education)) +
+  geom_bar(stat = "identity", position=position_dodge()) + 
+    scale_fill_brewer(palette="Blues")
+
+```
+
+ 
+
+
+## Problem 2: Students performance in exams
+Analysis: Correlation between students performance and parental level of education.
+
+### Read in Data  
+
+```{r}
+url_2="https://raw.githubusercontent.com/Lnkiim/DATA607FALL202/master/Week6/happiness2019.csv"
+raw_happy <-read_csv(url(url_2))
+```
+
+
+### Rename column names
+```{r}
+happy1 <- raw_happy
+names(happy1) <- c('overall_rank', 'country_region','score','gdp_per_capita', 'social_support', 'health_life_expectancy', 'freedom_choice', 'generosity', 'corruption_perception')
+
+
+
+```
+ 
+
+
 
