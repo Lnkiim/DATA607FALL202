@@ -11,20 +11,24 @@ editor_options:
 library(tidyverse)
 library(openintro)
 library (readr)
-library(wesanderson)
+library(dplyr)
 ```
 
 ## Problem 1: Students performance in exams
-Analysis: Correlation between students performance and parental level of education.
+Question posed by discussion forum: Correlation between students performance and parental level of education.
 
-### Read in Data  
+
 
 ```{r}
+
+# read in data
 url_1="https://raw.githubusercontent.com/Lnkiim/DATA607FALL202/master/Week6/StudentsPerformance.csv"
 raw_studentExam <-read_csv(url(url_1))
 ```
 
 ### What was the average score according to parental level of education?
+
+If you look at the results from avgByParentEd dataframe, it will show that the average total score of a child is directly and positively correlated with a parent's level of education. Meaning, that children who had parents with higher levels of education had higher test scores. Not much else can be extrapolated from this statistic. There could be several factors as to why this relationship exists. A parent with a higher level of education could make more money, provide their child with more resources, live in a district with better schools, etc. Others could argue there is a biological/hereditary factor but we couldn't provide a root cause of these findings. 
  
 ```{r}
 # change header names
@@ -63,8 +67,6 @@ avgByParentEd <-
 
 # graph
 
-
-
 ggplot(data = avgByParentEd, aes(x=test_category, y = score, fill=parent_education)) +
   geom_bar(stat = "identity", position=position_dodge()) + 
     scale_fill_brewer(palette="Blues")
@@ -75,25 +77,166 @@ ggplot(data = avgByParentEd, aes(x=test_category, y = score, fill=parent_educati
 
 
 ## Problem 2: Students performance in exams
-Analysis: Correlation between students performance and parental level of education.
+Question posed by discussion forum: Compare the (Happiness) Score and GDP per capita for the Top 20 countries to observe the correlation (if there is any).
 
-### Read in Data  
+There is a positive correlation between GDP per capita and happiness score. 
 
+This study already had very clean data and did not require much transformation so I completed 4 analysis instead of the required 3. 
+ 
 ```{r}
+
+# Read in data
 url_2="https://raw.githubusercontent.com/Lnkiim/DATA607FALL202/master/Week6/happiness2019.csv"
 raw_happy <-read_csv(url(url_2))
 ```
 
 
-### Rename column names
 ```{r}
+#rename columns
 happy1 <- raw_happy
 names(happy1) <- c('overall_rank', 'country_region','score','gdp_per_capita', 'social_support', 'health_life_expectancy', 'freedom_choice', 'generosity', 'corruption_perception')
 
-
+# plot
+ggplot(happy1, aes(x=score, y=gdp_per_capita)) +
+    geom_point(shape=1) +
+       geom_smooth(method=lm)
 
 ```
  
+ 
+## Problem 3: Food and Agriculture Organization: Who eats the food we grow?
+Question posed by discussion forum: "I think the most interesting thing to do would be to figure out if feed has overtaken food in any areas or food items."
+
+ It appears that Denmark and Poland are producing more feed than food. 
+
+
+```{r}
+# Read in the data
+url_3="https://raw.githubusercontent.com/Lnkiim/DATA607FALL202/master/Week6/FAO.csv"
+raw_food <-read_csv(url(url_3))
+food1 <- raw_food
+
+# new attributes
+food1$total_production <- rowSums(food1[11:63])
+food1$total_last10years <- rowSums(food1[53:63])
+
+# group by country, transpose to element category - feed vs food
+feed_country <-
+  food1 %>% 
+      group_by(Element, Area) %>% 
+        summarize(totalProdByElement = sum(total_production)) %>%
+          spread(key = Element, value = totalProdByElement) %>%
+            filter(Feed > Food)
+
+print(feed_country)
+
+```
+
+
+
+## Problem 4: School Diversity
+Question posed by discussion forum:"Calculate the racial average for each school in each state and put into a separate table"
+
+Below I've changed the percentage column to be expressed as a decimal to avoid confusion on what unit the column is in. 
+The datafram titled `by_school` answer the question posed in the discussion forum.
+
+```{r}
+# Read in the Data
+url_4="https://raw.githubusercontent.com/szx868/data607/master/school_diversity.csv"
+raw_school <-read_csv(url(url_4))
+ 
+
+# percentage should be expressed as decimal to avoid confusion about what unit this column is in
+# create new column as percentage
+school1 <-
+  raw_school %>%
+    mutate(Asian = Asian / 100,
+           Black = Black / 100,
+           Hispanic = Hispanic/100,
+           White = White /100,
+           Multi = Multi/100
+          )
+
+
+by_school <-
+  school1 %>%
+    group_by(LEA_NAME) %>%
+      summarize(avg_asian = mean(Asian),
+                  avg_black = mean(Black),
+                  avg_hispanic = mean(Hispanic),
+                  avg_white  = mean(White),
+                  avg_multi = mean(Multi)
+                    )
+
+```
+
+### A Different Question
+
+It doesn't make much sense to calculate the average when each school has observations from two different date ranges that are decades apart. Especially because we're investigating something to dynamic and disputed like racial difference in america, it doesn't make sense to discount the effect of time. It is also difficult to make some conclusion when the data is rolled up to a school level. I've decided to investigate how racial percentages play out according to state. 
+
+We should look at each date range separately then roll aggregate metrics to a state level.
+
+```{r}
+
+# split dataframe according to date range
+
+school_1994_1995 <-
+ school1 %>% 
+    filter(SCHOOL_YEAR == 	'1994-1995')
+
+school_2016_2017 <-
+ school1 %>% 
+    filter(SCHOOL_YEAR == 	'2016-2017')
+
+byState_2016 <-
+  school_2016_2017 %>%
+    group_by(ST) %>%
+      summarize(avg_asian = mean(Asian),
+                avg_black = mean(Black),
+                avg_hispanic = mean(Hispanic),
+                avg_white  = mean(White),
+                avg_multi = mean(Multi)
+                  )
+byState_2016$year <- '2016_2017'
+
+byState_1994 <-
+  school_1994_1995 %>%
+    group_by(ST) %>%
+      summarize(avg_asian = mean(Asian),
+                avg_black = mean(Black),
+                avg_hispanic = mean(Hispanic),
+                avg_white  = mean(White),
+                avg_multi = mean(Multi)
+                  )
+
+byState_1994$year <- '1994_1995'
+
+```
+
+### Graph the changes between the two decades
+
+```{r}
+by_state_all <- rbind(byState_1994, byState_2016)
+
+#asian average
+  ggplot(by_state_all, aes(x= ST, y= avg_asian, fill=year)) +
+	  geom_bar(stat='identity',  position=position_dodge()) 
+
+#black average
+  ggplot(by_state_all, aes(x= ST, y= avg_black, fill=year)) +
+	  geom_bar(stat='identity',  position=position_dodge()) 
+  
+# hispanic average
+  ggplot(by_state_all, aes(x= ST, y= avg_hispanic, fill=year)) +
+	  geom_bar(stat='identity',  position=position_dodge()) 
+  
+# white average
+  ggplot(by_state_all, aes(x= ST, y= avg_white , fill=year)) +
+	  geom_bar(stat='identity',  position=position_dodge()) 
+  
+#multi data doesn't exist for 1994_1995 dataset
+  
+```
 
 
 
