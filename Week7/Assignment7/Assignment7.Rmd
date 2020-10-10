@@ -9,18 +9,31 @@ output: openintro::lab_report
 library(tidyverse)
 library(openintro) 
 library(XML)
-#library(xml2)
 library(dplyr)
 library(rvest)
 library(RCurl)
 library(rlist)
+library (readr)
+
+
 ```
+
+### Overview of Problem and Approach
+I first created the 3 raw data sources in a text editor, uploaded them into github so that the code is reproducible. I used libraries that parsed the data into object and turned them into dataframes. 
+On a cosmetic level, the dataframes appear to be identical. (more discussed below)
+
 
 ### XML File
 
 ```{r}
-xml <- read_xml("/Users/ellenkim/CUNY/data_acquisition_management/AcqMgmtRepot_DATA607FALL202/Week7/cookbooks_xml.xml") 
+ 
+# Reads in file from url
+xml <- read_xml("https://raw.githubusercontent.com/Lnkiim/DATA607FALL202/master/Week7/cookbooks_xml.xml")
+
+# parases xml object
 xml_result <- xmlParse(xml)
+
+# turns xml object into a dataframe
 xml_dataframe <- xmlToDataFrame(xml_result)
  
 ```
@@ -28,10 +41,13 @@ xml_dataframe <- xmlToDataFrame(xml_result)
 ### HTML FILE
 
 ```{r}
-library(XML)
-html <- read_html("/Users/ellenkim/CUNY/data_acquisition_management/AcqMgmtRepot_DATA607FALL202/Week7/cookbooks_html.html")
+library(XML) 
 
+# reads in data
+html <- read_html("https://raw.githubusercontent.com/Lnkiim/DATA607FALL202/master/Week7/cookbooks_html.html")
+# parses into an html object
 html_result <- htmlParse(html)
+# turns html object into a dataframe 
 html_dataframe <- readHTMLTable(html_result, as.data.frame= TRUE)
 html_dataframe <- html_dataframe[[1]]
 
@@ -40,9 +56,20 @@ html_dataframe <- html_dataframe[[1]]
 
 ### JSON FILE
 ```{r}
-json <- "/Users/ellenkim/CUNY/data_acquisition_management/AcqMgmtRepot_DATA607FALL202/Week7/cookbooks_json.json"
 library(jsonlite)
+
+# reads in data 
+json <- "https://raw.githubusercontent.com/Lnkiim/DATA607FALL202/master/Week7/cookbooks_json.json"
+
 json_dataframe <- jsonlite::fromJSON(json)
 ```
 
+
+### Are dataframes the same?
+Using a function to compare the dataframe objects we can see that they are actually different. Depending on the raw data source, it seems that each has its own default datatype. For example, json objects will read numbers as numeric, while html objects will default numbers into characters. It may seem like an arbitrary detail but this inconsistency will require an additional layer of logic to transform. 
+
+```{r}
+all.equal(json_dataframe, html_dataframe)
+all.equal(xml_dataframe, html_dataframe)
+```
 
