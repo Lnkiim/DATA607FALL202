@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<books>
+    <row>
+      <Title>Vegetables Unleashed</Title>
+      <authors>Jose Andres, Matt Goulding</authors>
+      <releaseYear>2019</releaseYear>
+      <hardcoverPrice>24.55</hardcoverPrice>
+      <amazonRatingStars>4.7</amazonRatingStars>
+    </row>
+    <row>
+      <Title>The Food Lab </Title>
+      <authors>J. Kenji Lopez-Alt </authors>
+      <releaseYear>2015</releaseYear>
+      <hardcoverPrice>34.99</hardcoverPrice>
+      <amazonRatingStars>4.8</amazonRatingStars>
+    </row>
+    <row>
+      <Title>Flour Water Salt Yeast</Title>
+      <authors>Ken Forkish</authors>
+      <releaseYear>2012</releaseYear>
+      <hardcoverPrice>20.49</hardcoverPrice>
+      <amazonRatingStars>4.7</amazonRatingStars>
+    </row>
+</books>

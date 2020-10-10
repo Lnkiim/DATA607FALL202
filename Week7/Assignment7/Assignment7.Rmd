@@ -1,0 +1,48 @@
+---
+title: "Assignment 7: Working with XML and JSON"
+author: "Author Name"
+date: "`r Sys.Date()`"
+output: openintro::lab_report
+---
+
+```{r load-packages, message=FALSE}
+library(tidyverse)
+library(openintro) 
+library(XML)
+#library(xml2)
+library(dplyr)
+library(rvest)
+library(RCurl)
+library(rlist)
+```
+
+### XML File
+
+```{r}
+xml <- read_xml("/Users/ellenkim/CUNY/data_acquisition_management/AcqMgmtRepot_DATA607FALL202/Week7/cookbooks_xml.xml") 
+xml_result <- xmlParse(xml)
+xml_dataframe <- xmlToDataFrame(xml_result)
+ 
+```
+
+### HTML FILE
+
+```{r}
+library(XML)
+html <- read_html("/Users/ellenkim/CUNY/data_acquisition_management/AcqMgmtRepot_DATA607FALL202/Week7/cookbooks_html.html")
+
+html_result <- htmlParse(html)
+html_dataframe <- readHTMLTable(html_result, as.data.frame= TRUE)
+html_dataframe <- html_dataframe[[1]]
+
+```
+
+
+### JSON FILE
+```{r}
+json <- "/Users/ellenkim/CUNY/data_acquisition_management/AcqMgmtRepot_DATA607FALL202/Week7/cookbooks_json.json"
+library(jsonlite)
+json_dataframe <- jsonlite::fromJSON(json)
+```
+
+
