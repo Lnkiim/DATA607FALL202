@@ -1,0 +1,37 @@
+---
+title: "Week 9 Assignment – Web APIs"
+author: "Ellen Kim"
+date: "`r Sys.Date()`"
+output: openintro::lab_report
+---
+
+```{r load-packages, message=FALSE}
+library(tidyverse)
+library(openintro)
+library(httr)
+library(jsonlite)
+```
+
+### Description of Problem
+
+The objective of this script is to access a NYTimes API, construct an interface to read in a JSON object, and transform the data into a dataframe. For the purpose of this assignment, I've chosen the "Most Popular" API. 
+
+```{r}
+NYTIMES_KEY = readLines("nytApiKey.txt") 
+```
+
+### API Transformation
+
+After creating an dev account, registering my app, and authorizing my key so that it can make calls to this app, I was able to enter parameters so that my call retrieved the most popular articles in the last 30 days. The return includes meta data about the status of my call as well as the data. The response was a list of length 4. The first three items were information about my call, and the last item was a datframe. My dataframe include individual datapoints but also had embedded datatypes that could be further parsed and reorganized.
+```{r}
+ 
+mostPopularApi <- fromJSON("https://api.nytimes.com/svc/mostpopular/v2/viewed/30.json?api-key=EvMLIPctBkeWvDdTLt50rMUFjGpwyzJV")
+
+# the response from the get is a list of 4 items
+# the last object in the list is a dataframe that contains the data
+
+api_df <- mostPopularApi$results
+
+api_df[1,]
+```
+ 
