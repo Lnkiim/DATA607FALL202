@@ -1,0 +1,335 @@
+---
+title: "Week 10 Assignment – Sentiment Analysis"
+author: "Ellen Kim"
+date: "`r Sys.Date()`"
+output: openintro::lab_report
+---
+
+```{r load-packages, message=FALSE}
+library(tidyverse)
+library(openintro)
+library(dplyr)
+library(tidytext)
+library(textdata)
+library(tidyr)
+library(janeaustenr) 
+library(ggplot2)
+library(stringr)
+```
+
+### Re-create base analysis
+
+Insert any text here.
+
+```{r}
+
+get_sentiments("afinn")
+get_sentiments("bing")
+get_sentiments("nrc")
+
+# tokenize lines to words
+tidy_books <- austen_books() %>%
+  group_by(book) %>%
+  mutate(
+    linenumber = row_number(),
+    chapter = cumsum(str_detect(text, regex("^chapter [\\divxlc]",
+      ignore_case = TRUE
+    )))
+  ) %>%
+  ungroup() %>%
+  unnest_tokens(word, text)
+
+# get joy words from nrc
+nrc_joy <- get_sentiments("nrc") %>%
+  filter(sentiment == "joy")
+
+# inner join "joy' sentiment words from Emma
+tidy_books %>%
+  filter(book == "Emma") %>%
+  inner_join(nrc_joy) %>%
+  count(word, sort = TRUE)
+
+
+# for every chunk of 80 lines, sentiment = pos - negative
+jane_austen_sentiment <- tidy_books %>%
+  inner_join(get_sentiments("bing")) %>%
+  # breaking lines of a book into chunks of 80
+  count(book, index = linenumber %/% 80, sentiment) %>%
+  # transposing sentiment values as columns
+  spread(sentiment, n, fill = 0) %>%
+  mutate(sentiment = positive - negative)
+ 
+
+
+```
+
+
+
+```{r}
+ggplot(jane_austen_sentiment, aes(index, sentiment, fill = book)) +
+  geom_col(show.legend = FALSE) +
+  facet_wrap(~book, ncol = 2, scales = "free_x")
+
+```
+
+
+```{r}
+# 2.3 Comparing the three sentiment dictionaries
+
+library(tidyr)
+
+pride_prejudice <- tidy_books %>%
+  filter(book == "Pride & Prejudice")
+
+# sentiment by 80 line chunks using AFINN
+afinn <- pride_prejudice %>%
+  inner_join(get_sentiments("afinn")) %>%
+  group_by(index = linenumber %/% 80) %>%
+  summarise(sentiment = sum(value)) %>%
+  mutate(method = "AFINN")
+
+# stack after getting sentiments of 2 diff lexicon dictionaries
+# then calculate sentiment, partitioned by every 80 lines
+bing_and_nrc <- bind_rows(
+  # get sentiment for bing
+  pride_prejudice %>%
+    inner_join(get_sentiments("bing")) %>%
+    mutate(method = "Bing et al."),
+  # get sentiment for nrc
+  pride_prejudice %>%
+    inner_join(get_sentiments("nrc") %>%
+      filter(sentiment %in% c(
+        "positive",
+        "negative"
+      ))) %>%
+    mutate(method = "NRC")
+) %>%
+  count(method, index = linenumber %/% 80, sentiment) %>%
+  spread(sentiment, n, fill = 0) %>%
+  mutate(sentiment = positive - negative)
+
+
+
+
+```
+
+
+
+
+```{r}
+# stack 3rd lexicon library AFINN and plot
+bind_rows(
+  afinn,
+  bing_and_nrc
+) %>%
+  ggplot(aes(index, sentiment, fill = method)) +
+  geom_col(show.legend = FALSE) +
+  facet_wrap(~method, ncol = 1, scales = "free_y")
+
+```
+
+
+
+
+
+```{r}
+
+get_sentiments("nrc") %>%
+  filter(sentiment %in% c(
+    "positive",
+    "negative"
+  )) %>%
+  count(sentiment)
+
+get_sentiments("bing") %>%
+  count(sentiment)
+```
+
+
+
+
+```{r}
+#2.4 Most common positive and negative words
+
+bing_word_counts <- tidy_books %>%
+  inner_join(get_sentiments("bing")) %>%
+  count(word, sentiment, sort = TRUE) %>%
+  ungroup()
+
+# most common words
+bing_word_counts
+
+bing_word_counts %>%
+  group_by(sentiment) %>%
+  top_n(10) %>%
+  ungroup() %>%
+  mutate(word = reorder(word, n)) %>%
+  ggplot(aes(word, n, fill = sentiment)) +
+  geom_col(show.legend = FALSE) +
+  facet_wrap(~sentiment, scales = "free_y") +
+  labs(
+    y = "Contribution to sentiment",
+    x = NULL
+  ) +
+  coord_flip()
+
+```
+
+
+
+```{r}
+# creating custom stop words list by appending to stop_words
+custom_stop_words <- bind_rows(
+  tibble(
+    word = c("miss"),
+    lexicon = c("custom")
+  ),
+  stop_words
+)
+
+library(wordcloud)
+
+tidy_books %>%
+  anti_join(stop_words) %>%
+  count(word) %>%
+  with(wordcloud(word, n, max.words = 100))
+
+```
+
+
+```{r}
+library(reshape2)
+
+tidy_books %>%
+  inner_join(get_sentiments("bing")) %>%
+  count(word, sentiment, sort = TRUE) %>%
+  acast(word ~ sentiment, value.var = "n", fill = 0) %>%
+  comparison.cloud(
+    colors = c("gray20", "gray80"),
+    max.words = 100
+  )
+```
+
+
+
+
+```{r}
+# partitioned by sentence. delimter is period.
+PandP_sentences <- tibble(text = prideprejudice) %>%
+  unnest_tokens(sentence, text, token = "sentences")
+
+austen_chapters <- austen_books() %>%
+  group_by(book) %>%
+  unnest_tokens(chapter, text,
+    token = "regex",
+    pattern = "Chapter|CHAPTER [\\dIVXLC]"
+  ) %>%
+  ungroup()
+
+austen_chapters %>%
+  group_by(book) %>%
+  summarise(chapters = n())
+
+
+bingnegative <- get_sentiments("bing") %>%
+  filter(sentiment == "negative")
+
+wordcounts <- tidy_books %>%
+  group_by(book, chapter) %>%
+  summarize(words = n())
+
+tidy_books %>%
+  semi_join(bingnegative) %>%
+  group_by(book, chapter) %>%
+  summarize(negativewords = n()) %>%
+  left_join(wordcounts, by = c("book", "chapter")) %>%
+  mutate(ratio = negativewords / words) %>%
+  filter(chapter != 0) %>%
+  top_n(1) %>%
+  ungroup()
+
+```
+
+### My Corpus
+My corporus is a dataset which has reviews for gourmet foods sold on Amazon. I would like to compare the sentiment analysis results with the stars given for each product. 
+
+```{r}
+
+library(readr)
+
+# file is too large. won't upload to git with free account
+food_reviews <- read_csv(file= "Reviews.csv")
+
+
+# data is taking too long to render
+# Lets partition the data by random sampling 
+
+## 75% of the sample size
+smp_size <- floor(0.50 * nrow(food_reviews))
+
+## set the seed to make your partition reproducible
+set.seed(123)
+train_ind <- sample(seq_len(nrow(food_reviews)), size = smp_size)
+
+# creates smaller set but also create identity column
+train <- food_reviews[train_ind, ]
+#test <- food_reviews[-train_ind, ]
+
+ 
+tidy_reviews <- train %>%
+  select(Id, ProductId, UserId, Score, Text) %>% 
+    unnest_tokens(word, Text) %>%
+    anti_join(stop_words)
+
+tidy_reviews_bing <- tidy_reviews %>%
+  inner_join(get_sentiments("bing")) %>%
+    count(ProductId, Id, sentiment, Score) %>%
+      spread(sentiment, n, fill=0) %>%
+      mutate(sentiment = positive - negative)
+  
+tidy_reviews_bing %>%
+  group_by(Score) %>%
+    summarize(avg_score = mean(sentiment))
+ 
+```
+
+### Conclusion
+We can see that the average score from the sentiment scoring is aligned with the score given by the reviewer. While the amazon reviews are on a scale of 1 to 5, the sentment count is not bound by the same scale. However, the average sentiment score is relative and does show that the lowest scored items (equal to 1) also has the lowest sentiment score, while the highest review score of 5, also has the highest sentiment scoring.
+ 
+ 
+### A Different Lexicon
+Previously we were using the Bing lexicon. Lets see if the "AFINN" lexicon gives us significantly different results. 
+Methodology: Using tokenized dataframe, inner join with afinn lexicon. This lexicon outputs values from -5 to 5. The count by ProductId, Id, and Score, which results in a frequency for each sentiment value that occurs for one review. Next, create new feature called sent_times_n, which creates a score that takes frequency of each sentiment value into account. The final sentiment score, is the average score for a single review.
+
+```{r}
+tidy_reviews_afinn <- tidy_reviews %>%
+  inner_join(get_sentiments("afinn")) %>%
+    count(ProductId, Id, value, Score) %>%
+      mutate(sent_times_n = value * n) %>%
+      group_by(ProductId, Id,  Score) %>%
+      mutate(sentiment_score = mean(sent_times_n)) %>%
+      ungroup() 
+
+tidy_reviews_afinn %>%
+  group_by(Score) %>%
+    summarize(avg_score = mean(sentiment_score))
+```
+
+#### Findings of Second Lexicon
+
+The use of different lexicon again, align with the ratings, as well as the conclusions of the first lexicon. Relative to each other, the lowest rated items have the lowest sentiment score and the highest rated items have the highest sentiment scores. Because my analysis had was based on relativity, it doesn't make a signficant difference in which lexicon is used. 
+
+
+```{r}
+
+```
+
+
+
+
+
+
+
+
+
+
